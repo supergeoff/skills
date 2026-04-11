@@ -3,141 +3,141 @@ name: tsv-analyst
 description: "Use this skill any time the user wants to perform calculations, aggregations, or statistical analysis on a TSV (or CSV) file and get the results as a structured TSV. Trigger for tasks like: computing totals, averages, percentages, rankings; building KPI summaries or indicator tables from raw data exports; comparing metrics across categories, time periods, or groups; calculating compliance or anomaly rates. Trigger whenever the user uploads or references a TSV/CSV file and wants to derive indicators, metrics, or summaries — even if they don't use 'TSV' or 'calculate'. Also trigger for 'verification file', 'indicator table', or 'KPI summary' requests. The key signal: raw tabular data → computed results the user can trust and verify. Do NOT trigger when the user only wants to view, format, or clean a file, or when the output should be a chart, Word doc, or presentation."
 ---
 
-# TSV Analyst — Calculs Python sur données tabulaires
+# TSV Analyst — Python Calculations on Tabular Data
 
-Ce skill transforme n'importe quel fichier TSV (ou CSV) en un tableau structuré d'indicateurs calculés avec Python, vérifiables et reproductibles.
+This skill transforms any TSV (or CSV) file into a structured table of indicators calculated with Python, which are verifiable and reproducible.
 
-## Philosophie
+## Philosophy
 
-Les calculs sur des données volumineuses doivent être confiés à du code déterministe, pas à l'estimation du modèle. Ce skill génère et exécute du code Python (pandas) pour garantir l'exactitude des résultats — puis structure la sortie dans un TSV lisible et vérifiable par l'utilisateur.
+Calculations on large datasets must be entrusted to deterministic code, not to the model's estimation. This skill generates and executes Python code (pandas) to guarantee the accuracy of the results — then structures the output into a TSV that is readable and verifiable by the user.
 
-La transparence est centrale : chaque indicateur du TSV de sortie documente la formule Python utilisée et les colonnes sources, pour que l'utilisateur puisse reproduire ou contester n'importe quel chiffre.
+Transparency is central: each indicator in the output TSV documents the Python formula used and the source columns, so that the user can reproduce or challenge any figure.
 
 ---
 
 ## Workflow
 
-### Étape 1 — Chargement et inspection du fichier
+### Step 1 — File Loading and Inspection
 
-Charge le fichier TSV/CSV avec pandas. Commence toujours par une inspection rapide :
+Load the TSV/CSV file with pandas. Always start with a quick inspection:
 
 ```python
 import pandas as pd
 
-# Détection automatique du séparateur
+# Automatic detection of the separator
 df = pd.read_csv(filepath, sep=None, engine='python', encoding='utf-8-sig')
 
-print(f"Dimensions : {df.shape[0]} lignes × {df.shape[1]} colonnes")
-print(f"\nColonnes et types :\n{df.dtypes}")
-print(f"\nAperçu :\n{df.head(3).to_string()}")
-print(f"\nValeurs manquantes :\n{df.isnull().sum()[df.isnull().sum() > 0]}")
+print(f"Dimensions : {df.shape[0]} rows × {df.shape[1]} columns")
+print(f"\nColumns and types:\n{df.dtypes}")
+print(f"\nPreview:\n{df.head(3).to_string()}")
+print(f"\nMissing values:\n{df.isnull().sum()[df.isnull().sum() > 0]}")
 ```
 
-Présente à l'utilisateur en quelques lignes :
-- Les dimensions du fichier
-- Les colonnes identifiées (numériques, catégorielles, dates, booléennes)
-- La période couverte si une colonne date est détectée
-- Les anomalies évidentes (valeurs manquantes, doublons potentiels)
+Present to the user in a few lines:
+- The file dimensions
+- The identified columns (numeric, categorical, dates, booleans)
+- The covered period if a date column is detected
+- Obvious anomalies (missing values, potential duplicates)
 
-### Étape 2 — Résolution des ambiguïtés avant tout calcul
+### Step 2 — Resolving Ambiguities Before Any Calculation
 
-Avant de confirmer les indicateurs à calculer, **résous les ambiguïtés sémantiques** en mappant les termes utilisés par l'utilisateur vers les colonnes réelles du fichier.
+Before confirming the indicators to calculate, **resolve semantic ambiguities** by mapping the terms used by the user to the actual columns in the file.
 
-Pour chaque terme clé dans la demande de l'utilisateur (catégorie, département, type, service, région, nature, etc.), identifie les colonnes candidates dans le fichier. Si plusieurs colonnes correspondent, présente les options et demande à l'utilisateur de choisir **avant** de calculer quoi que ce soit.
+For each key term in the user's request (category, department, type, service, region, nature, etc.), identify the candidate columns in the file. If multiple columns match, present the options and ask the user to choose **before** calculating anything.
 
-Exemple de résolution d'ambiguïté :
-> L'utilisateur demande "top 5 des services". Le fichier contient deux colonnes candidates :
-> - `Service` (valeurs : DIV NATIONAL, BU OUEST, BU NORD…) → départements
-> - `Domaine d'activité` (valeurs : Hôtel, Train, Vol, Frais…) → types de transport
+Ambiguity resolution example:
+> The user asks for the "top 5 services". The file contains two candidate columns:
+> - `Service` (values: NATIONAL DIV, WEST BU, NORTH BU...) → departments
+> - `Business Area` (values: Hotel, Train, Flight, Expenses...) → transport types
 >
-> → Demander : "Par 'services', voulez-vous dire les départements (colonne `Service`) ou les types de dépenses (colonne `Domaine d'activité`) ?"
+> → Ask: "By 'services', do you mean the departments (`Service` column) or the expense types (`Business Area` column)?"
 
-Cette étape est non négociable : une mauvaise interprétation silencieuse produit des chiffres corrects mais pour la mauvaise question. Il vaut mieux demander 10 secondes que livrer une analyse inexacte.
+This step is non-negotiable: silent misinterpretation produces correct figures but for the wrong question. It is better to ask for 10 seconds than to deliver an inaccurate analysis.
 
-### Étape 3 — Confirmation des indicateurs à calculer
+### Step 3 — Confirmation of Indicators to Calculate
 
-Une fois les ambiguïtés résolues, si l'utilisateur n'a pas encore précisé ce qu'il veut calculer, propose une liste d'indicateurs déduits automatiquement de la structure du fichier. Regroupe-les en familles logiques (Volume, Répartition, Conformité, Temporalité, Classements). Attends confirmation avant de passer au calcul.
+Once ambiguities are resolved, if the user hasn't specified what they want to calculate yet, propose a list of indicators automatically deduced from the file structure. Group them into logical families (Volume, Distribution, Compliance, Temporality, Rankings). Wait for confirmation before proceeding to calculation.
 
-Si l'utilisateur a déjà listé ses indicateurs, synthétise ce que tu as compris — en nommant les colonnes exactes que tu vas utiliser — et demande validation avant d'exécuter.
+If the user has already listed their indicators, summarize what you understood — naming the exact columns you will use — and ask for validation before executing.
 
-### Étape 4 — Génération et exécution du code Python
+### Step 4 — Python Code Generation and Execution
 
-Pour chaque indicateur demandé, génère du code pandas clair et lisible. Montre le code à l'utilisateur **avant** de l'exécuter — cela renforce la confiance et permet la correction.
+For each requested indicator, generate clear and readable pandas code. Show the code to the user **before** executing it — this builds trust and allows for correction.
 
-**Principes de génération du code :**
+**Code generation principles:**
 
-- Utilise des variables intermédiaires bien nommées plutôt que des one-liners illisibles
-- Filtre les données avant d'agréger (ex : exclure les annulations si pertinent)
-- Gère explicitement les valeurs nulles (dropna ou fillna selon le contexte)
-- Arrondis les pourcentages à 1 décimale, les montants à 2 décimales
-- Documente chaque bloc avec un commentaire `# Indicateur : nom`
+- Use well-named intermediate variables rather than unreadable one-liners
+- Filter data before aggregating (e.g., exclude cancellations if relevant)
+- Explicitly handle null values (dropna or fillna depending on context)
+- Round percentages to 1 decimal place, amounts to 2 decimal places
+- Document each block with a comment `# Indicator: name`
 
-Exemple de pattern pour un agrégat par catégorie :
+Pattern example for an aggregate by category:
 
 ```python
-# Indicateur : Dépenses totales par type de transport
-# Colonne utilisée : 'Domaine d'activité' (types : Hôtel, Train, Vol, Frais)
-df_actif = df[df['Active'] == 'Oui']  # filtre sur lignes actives
-total_par_type = (
-    df_actif
-    .groupby("Domaine d'activité")['Montant de la transaction(€)']
+# Indicator: Total expenses by transport type
+# Column used: 'Business Area' (types: Hotel, Train, Flight, Expenses)
+df_active = df[df['Active'] == 'Yes']  # filter on active rows
+total_by_type = (
+    df_active
+    .groupby("Business Area")['Transaction Amount(€)']
     .sum()
     .round(2)
     .sort_values(ascending=False)
 )
 ```
 
-### Étape 5 — Construction du TSV de sortie
+### Step 5 — Construction of the Output TSV
 
-Une fois tous les calculs exécutés, consolide les résultats dans un DataFrame pandas avec exactement ces 6 colonnes :
+Once all calculations are executed, consolidate the results into a pandas DataFrame with exactly these 6 columns:
 
-| Colonne | Description |
+| Column | Description |
 |---------|-------------|
-| `Famille` | Catégorie de l'indicateur (ex : "Volume & Montants") |
-| `Indicateur` | Nom précis de l'indicateur |
-| `Valeur` | Résultat formaté lisiblement (ex : "1 234 567 €", "42,3 %", "127 lignes") |
-| `Périmètre_Filtre` | Filtre appliqué (ex : "Active='Oui'", "Toutes lignes", "Année=2025") |
-| `Formule_Python` | Expression pandas synthétique (ex : `df[filtre].groupby('col')['montant'].sum()`) |
-| `Colonnes_Sources` | Noms exacts des colonnes utilisées, séparés par des virgules |
+| `Family` | Indicator category (e.g.: "Volume & Amounts") |
+| `Indicator` | Precise name of the indicator |
+| `Value` | Readably formatted result (e.g.: "1,234,567 €", "42.3 %", "127 rows") |
+| `Scope_Filter` | Applied filter (e.g.: "Active='Yes'", "All rows", "Year=2025") |
+| `Python_Formula` | Synthetic pandas expression (e.g.: `df[filter].groupby('col')['amount'].sum()`) |
+| `Source_Columns` | Exact names of the used columns, separated by commas |
 
-Sauvegarde le résultat :
+Save the result:
 
 ```python
 results_df.to_csv(output_path, sep='\t', index=False, encoding='utf-8-sig')
 ```
 
-Sauvegarde aussi le script Python complet utilisé (pour auditabilité) :
+Also save the complete Python script used (for auditability):
 
 ```python
 with open(script_output_path, 'w', encoding='utf-8') as f:
     f.write(full_script_code)
 ```
 
-### Étape 6 — Points de vigilance
+### Step 6 — Points of Vigilance
 
-Après la production du TSV, signale systématiquement :
-- Les hypothèses prises (ex : "Les lignes annulées ont été exclues du total des dépenses")
-- Les colonnes ambiguës ou dont l'interprétation est incertaine
-- Les indicateurs pour lesquels une vérification manuelle sur un échantillon est recommandée
-
----
-
-## Règles importantes
-
-**Résoudre avant de calculer** : toujours mapper les termes de l'utilisateur vers les colonnes réelles du fichier. Si un terme peut désigner plusieurs colonnes différentes, demander avant de supposer.
-
-**Exactitude avant tout** : ne jamais estimer ou approximer un calcul — si pandas peut le calculer, il doit le calculer. Si un calcul est impossible (données insuffisantes, colonne introuvable), le dire explicitement.
-
-**Code d'abord** : toujours montrer le code avant de l'exécuter. L'utilisateur doit pouvoir corriger une mauvaise interprétation avant que les calculs ne soient faits.
-
-**Fichiers de sortie dans le dossier de travail** : sauvegarder le TSV résultat et le script `.py` dans le dossier de travail de l'utilisateur, pas dans un répertoire temporaire.
-
-**Nommage des fichiers de sortie** : utiliser un nom descriptif, par exemple `indicateurs_[nom_fichier_source]_[date].tsv` et `calculs_[nom_fichier_source]_[date].py`.
-
-**Séparateur de sortie** : toujours utiliser la tabulation (`\t`) comme séparateur dans le TSV de sortie, et l'encodage `utf-8-sig` pour garantir la compatibilité avec Excel.
+After producing the TSV, systematically point out:
+- The assumptions made (e.g.: "Cancelled rows were excluded from total expenses")
+- Ambiguous columns or those with uncertain interpretation
+- Indicators for which manual verification on a sample is recommended
 
 ---
 
-## Étape suivante
+## Important Rules
 
-Une fois le TSV validé par l'utilisateur, orienter vers le skill **TSV → Présentation HTML** pour transformer les indicateurs en une présentation visuelle.
+**Resolve before calculating**: always map the user's terms to the actual columns in the file. If a term could refer to several different columns, ask before assuming.
+
+**Accuracy above all**: never estimate or approximate a calculation — if pandas can calculate it, it must calculate it. If a calculation is impossible (insufficient data, column not found), explicitly say so.
+
+**Code first**: always show the code before executing it. The user must be able to correct a misinterpretation before the calculations are made.
+
+**Output files in the working directory**: save the resulting TSV and the `.py` script in the user's working directory, not in a temporary directory.
+
+**Output file naming**: use a descriptive name, for example `indicators_[source_file_name]_[date].tsv` and `calculations_[source_file_name]_[date].py`.
+
+**Output separator**: always use the tab character (`\t`) as a separator in the output TSV, and `utf-8-sig` encoding to ensure compatibility with Excel.
+
+---
+
+## Next Step
+
+Once the TSV is validated by the user, steer them towards the **TSV → HTML Presentation** skill to transform the indicators into a visual presentation.
