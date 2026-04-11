@@ -47,7 +47,7 @@ Pour chaque terme clé dans la demande de l'utilisateur (catégorie, départemen
 
 Exemple de résolution d'ambiguïté :
 > L'utilisateur demande "top 5 des services". Le fichier contient deux colonnes candidates :
-> - `Service` (valeurs : CRIT NATIONAL, CRIT OUEST, CRIT NORD…) → départements
+> - `Service` (valeurs : DIV NATIONAL, BU OUEST, BU NORD…) → départements
 > - `Domaine d'activité` (valeurs : Hôtel, Train, Vol, Frais…) → types de transport
 >
 > → Demander : "Par 'services', voulez-vous dire les départements (colonne `Service`) ou les types de dépenses (colonne `Domaine d'activité`) ?"
