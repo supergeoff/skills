@@ -1,0 +1,13 @@
+[tools]
+node = "latest"
+bun = "latest"
+"npm:opencode-ai" = "latest"
+
+[settings]
+
+[settings.npm]
+package_manager = "bun"
+
+[env]
+OPENCODE_ENABLE_EXA = "true"
+EDITOR = "code --wait"
