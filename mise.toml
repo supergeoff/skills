@@ -5,11 +5,14 @@ bun = "latest"
 python = "latest"
 uv = "latest"
 
-[settings]
-
 [settings.npm]
 package_manager = "bun"
 
 [env]
+_.python.venv = { path = ".venv", create = true }
 OPENCODE_ENABLE_EXA = "true"
 EDITOR = "code --wait"
+
+[tasks.sync]
+description = "Sync Python dependencies"
+run = "uv sync"
