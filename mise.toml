@@ -2,6 +2,8 @@
 node = "latest"
 bun = "latest"
 "npm:opencode-ai" = "latest"
+python = "latest"
+uv = "latest"
 
 [settings]
 

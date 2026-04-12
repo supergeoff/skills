@@ -1,6 +1,6 @@
 ---
 name: mermaid-diagram-builder
-description: Create rigorous, precise diagrams (flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, Gantt charts, pie charts, mindmaps, architecture diagrams, etc.) from text descriptions, specifications, code, or any textual input. Generate output as standalone HTML files with embedded Mermaid.js rendering, or raw Mermaid code blocks. Use this skill whenever the user wants to visualize relationships, processes, systems, data models, workflows, architectures, or any structured information — even if they don't explicitly mention 'diagram' or 'mermaid'. Also use when users ask to 'draw', 'map', 'visualize', 'chart', 'illustrate', or 'show how X works'.
+description: Create rigorous, precise diagrams (flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, Gantt charts, pie charts, mindmaps, architecture diagrams, etc.) from text descriptions, specifications, code, or any textual input. Generate output as standalone HTML files with embedded Mermaid.js rendering, SVG files for PowerPoint/Google Slides presentations (with transparent background), and .mmd source files persisted alongside SVGs. Use this skill whenever the user wants to visualize relationships, processes, systems, data models, workflows, architectures, or any structured information — even if they don't explicitly mention 'diagram' or 'mermaid'. Also use when users ask to 'draw', 'map', 'visualize', 'chart', 'illustrate', or 'show how X works'.
 ---
 
 # Mermaid Diagram Builder
@@ -75,23 +75,48 @@ After extraction, cross-reference against the original input:
 - Are cardinalities correct (1:1, 1:N, N:M)?
 - Are directions correct (who initiates, who responds)?
 
-## Step 2: Choose the Output Format
+## Step 2: Output Format — Dual Output Strategy
 
-### Option A: Standalone HTML (default, recommended)
+Every diagram generation produces **three files**:
 
-Generate a self-contained HTML file that renders the Mermaid diagram with professional styling. Use this unless the user specifically asks for raw Mermaid code.
+| File | Purpose | Notes |
+|------|---------|-------|
+| `*.mmd` | Mermaid source | Persisted alongside SVG for re-generation |
+| `*.svg` | Presentation-ready | Transparent background, for PowerPoint/Google Slides |
+| `*.html` | Interactive viewing | Aggregates ALL diagrams from the request |
 
-Advantages:
-- Instantly viewable in any browser
-- Professional styling out of the box
-- Interactive (zoom, pan, fullscreen)
-- Supports all Mermaid diagram types
-- Can include multiple diagrams in one page
-- Export-ready (can print to PDF)
+### SVG Output for Presentations
 
-### Option B: Raw Mermaid code block
+SVG files are optimized for presentation tools:
+- **Transparent background** (`-b transparent`): Blends into any slide theme
+- **Default theme** (`-t default`): Maximum compatibility
+- **Vector format**: Scales to any size without quality loss
 
-Use when the user explicitly asks for Mermaid syntax, or when the output will be embedded in Markdown/Confluence/Notion.
+### HTML Output
+
+The HTML file renders all diagrams with:
+- Professional styling (classDef colors)
+- Zoom, pan, and fullscreen capabilities
+- Copy-to-clipboard for Mermaid source
+- Dark/light theme toggle
+
+### Multiple Diagrams
+
+When a request produces multiple diagrams:
+- Each diagram generates its own `.mmd` and `.svg` pair
+- HTML file contains ALL diagrams with tab navigation
+- Final output lists all generated files
+
+### Output Structure Example
+
+```
+<output-dir>/
+├── flowchart_2026-04-12_14-30-45.mmd
+├── flowchart_2026-04-12_14-30-45.svg
+├── sequence_2026-04-12_14-30-46.mmd
+├── sequence_2026-04-12_14-30-46.svg
+└── all-diagrams.html
+```
 
 ## Step 3: Build the Diagram
 
@@ -178,7 +203,69 @@ Apply semantic color coding consistently:
 - **Red (#D0021B)**: Error paths, failure outcomes
 - **Purple (#9B59B6)**: Start/end nodes, milestones
 
-## Step 4: Generate HTML Output
+## Step 4: Generate SVG Output (mermaid-cli)
+
+### 4.1 Check Prerequisites
+
+Before generating SVG, verify mermaid-cli is available:
+
+```bash
+MMDC="./node_modules/.bin/mmdc"
+if [ ! -f "$MMDC" ]; then
+    echo "Installing mermaid-cli..."
+    npm install @mermaid-js/mermaid-cli --save-dev
+fi
+```
+
+If npm install fails, stop and instruct the user to install manually:
+```
+Please run: npm install @mermaid-js/mermaid-cli --save-dev
+Then re-run the diagram generation.
+```
+
+### 4.2 Generate .mmd Source File
+
+Create the Mermaid source file with timestamp-based naming:
+
+```bash
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+DIAGRAM_TYPE=$(echo "$MERMAID_CODE" | head -1 | grep -oE '^[a-zA-Z]+' || echo "diagram")
+MMD_FILE="<output-dir>/${DIAGRAM_TYPE}_${TIMESTAMP}.mmd"
+echo "$MERMAID_CODE" > "$MMD_FILE"
+```
+
+### 4.3 Convert to SVG with mmdc
+
+Execute mermaid-cli to generate SVG:
+
+```bash
+SVG_FILE="${MMD_FILE%.mmd}.svg"
+./node_modules/.bin/mmdc \
+    -i "$MMD_FILE" \
+    -o "$SVG_FILE" \
+    -b transparent \
+    -t default \
+    -c config/mermaid-config.json
+
+if [ ! -f "$SVG_FILE" ] || [ ! -s "$SVG_FILE" ]; then
+    echo "ERROR: SVG generation failed"
+    exit 1
+fi
+```
+
+Flags used:
+- `-b transparent`: Transparent background for slide compatibility
+- `-t default`: Default theme for maximum compatibility
+- `-c config/mermaid-config.json`: Preserve styling configuration
+
+### 4.4 Verify SVG Output
+
+Check the generated SVG:
+- File exists and has size > 0
+- Contains valid SVG markup (`<svg` tag)
+- No error messages from mmdc
+
+## Step 5: Generate HTML Output
 
 For standalone HTML, always use this template structure. Read `references/html-template.md` for the complete template.
 
@@ -195,7 +282,7 @@ The HTML file must:
 
 If the input naturally produces multiple perspectives (e.g., a class diagram AND a sequence diagram), generate all of them in a single HTML page with tab navigation or vertical sections. Each diagram should have a clear heading explaining what perspective it represents.
 
-## Step 5: Validate and Iterate
+## Step 6: Validate and Iterate
 
 After generating the diagram:
 
@@ -204,10 +291,26 @@ After generating the diagram:
 3. **Readability check**: Can someone unfamiliar with the source understand the diagram?
 4. **Render test**: If possible, verify the Mermaid syntax is valid by checking for common syntax errors.
 
+5. **SVG verification**: Confirm .svg file exists and has valid content (`<svg` tag, non-zero size)
+6. **MMD source check**: Confirm .mmd file persists alongside SVG for future re-generation
+
 If the diagram is complex (>15 nodes), consider:
 - Splitting into multiple focused diagrams
 - Adding a simplified overview + detailed sub-diagrams
 - Using subgraphs to group related elements
+
+## Step 7: Report Generated Files
+
+After successful generation, report to the user:
+
+```
+Generated files:
+├── <type>_<timestamp>.mmd  (Mermaid source)
+├── <type>_<timestamp>.svg  (Presentation-ready)
+└── all-diagrams.html       (Interactive viewer)
+```
+
+Present the SVG path clearly for direct use in PowerPoint/Google Slides.
 
 ## Specific Diagram Type Guidelines
 
@@ -410,6 +513,8 @@ Before delivering any diagram, verify:
 4. **Visual correctness**: The layout is readable, not overly wide or deep
 5. **Label correctness**: All labels use exact terminology from the source
 6. **Completeness**: No entities or relationships are missing
+7. **SVG generation**: mmdc command executed successfully, .svg file exists with valid content
+8. **File persistence**: Both .mmd and .svg files exist in output directory
 
 If any check fails, fix before delivering.
 
@@ -420,12 +525,19 @@ When generating a diagram:
 2. Select the appropriate diagram type(s)
 3. Write the Mermaid code
 4. Validate against the rigor checklist
-5. Generate the HTML file
-6. Save to the user's requested location (default: current directory)
-7. If the user wants to iterate, modify and re-render
+5. Check/install mermaid-cli if SVG output requested
+6. Generate .mmd source file (timestamp-based naming)
+7. Run mmdc to generate .svg file
+8. Generate HTML file (aggregates all diagrams)
+9. Save to the user's requested location (default: current directory)
+10. Report all generated files to user
+11. If the user wants to iterate, modify and re-render
 
 ## Reference Files
 
 - **`references/diagram-types.md`**: Comprehensive catalog of Mermaid diagram types with syntax reference and when to use each
 - **`references/html-template.md`**: Complete HTML template for rendering Mermaid diagrams with professional styling, zoom/pan, dark mode, and clipboard support
 - **`references/mermaid-syntax.md`**: Detailed Mermaid syntax reference covering all diagram types, with common patterns and pitfalls
+- **`references/mmdc-usage.md`**: Mermaid CLI (mmdc) usage guide for SVG generation, installation, and troubleshooting
+- **`config/mermaid-config.json`**: Default configuration for mmdc to preserve styling
+- **`scripts/install-mmdc.sh`**: Installation script for mermaid-cli in local node_modules
