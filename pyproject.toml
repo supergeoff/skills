@@ -1,7 +1,4 @@
 [project]
-name = "opencodeconfig"
-version = "0.1.0"
-description = "OpenCode configuration with custom skills and workflows"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",
