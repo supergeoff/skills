@@ -1,5 +1,5 @@
 ---
-name: mermaid-diagram-builder
+name: mermaid
 description: Create rigorous, precise diagrams (flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, Gantt charts, pie charts, mindmaps, architecture diagrams, etc.) from text descriptions, specifications, code, or any textual input. Generate output as standalone HTML files with embedded Mermaid.js rendering, SVG files for PowerPoint/Google Slides presentations (with transparent background), and .mmd source files persisted alongside SVGs. Use this skill whenever the user wants to visualize relationships, processes, systems, data models, workflows, architectures, or any structured information — even if they don't explicitly mention 'diagram' or 'mermaid'. Also use when users ask to 'draw', 'map', 'visualize', 'chart', 'illustrate', or 'show how X works'.
 ---
 
